@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BatyaGPT - 3.6 (BETA)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+        
+        body, html {
+            margin: 0; padding: 0; overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #030303 0%, #0a0a0f 50%, #050508 100%);
+            color: #d4d4d8; min-height: 100vh;
+            touch-action: manipulation;
+        }
+
+        #starfield { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+        .glass {
+            background: linear-gradient(145deg, rgba(18, 18, 24, 0.95) 0%, rgba(10, 10, 15, 0.98) 100%);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.7);
+        }
+
+        .chat-container::-webkit-scrollbar { width: 5px; }
+        .chat-container::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3b82f6, #8b5cf6); border-radius: 10px; }
+
+        .typing-cursor::after { content: '▋'; margin-left: 2px; color: #60a5fa; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        .btn-batya {
+            background: linear-gradient(145deg, rgba(30, 35, 50, 0.9) 0%, rgba(20, 25, 35, 0.95) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08); color: #a0aec0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+        .btn-batya:hover, .btn-batya:active { background: linear-gradient(145deg, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%); border-color: rgba(96, 165, 250, 0.4); color: #e2e8f0; }
+
+        .sidebar-btn {
+            background: linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+            border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s ease;
+        }
+        .sidebar-btn:hover, .sidebar-btn:active { background: linear-gradient(145deg, rgba(59, 130, 246, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%); }
+
+        .input-glow:focus { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); border-color: rgba(96, 165, 250, 0.5); }
+
+        .game-canvas { border-radius: 12px; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8); display: block; }
+
+        .level-bar-fill {
+            transition: width 0.8s ease;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .msg-batya { border-left: 3px solid #3b82f6; color: #c7d2fe; background: linear-gradient(145deg, rgba(20, 25, 40, 0.9) 0%, rgba(15, 18, 30, 0.95) 100%); }
+        .msg-user { background: linear-gradient(145deg, rgba(35, 40, 55, 0.9) 0%, rgba(25, 28, 40, 0.95) 100%); border: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; }
+        .nick-line { opacity: 0; transform: translateX(-15px); }
+
+        .game-btn { 
+            -webkit-tap-highlight-color: transparent; 
+            touch-action: manipulation; 
+            user-select: none; 
+            background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%); 
+            transition: all 0.1s ease;
+            cursor: pointer;
+        }
+        .game-btn:active { transform: scale(0.95); background: linear-gradient(145deg, rgba(59, 130, 246, 0.3) 0%, rgba(99, 102, 241, 0.3) 100%); }
+
+        .welcome-line { opacity: 0; transform: translateY(25px); }
+        .welcome-glow { text-shadow: 0 0 40px rgba(96, 165, 250, 0.5), 0 0 80px rgba(96, 165, 250, 0.3); }
+
+        .progress-ring { transform: rotate(-90deg); }
+        .progress-ring-circle { transition: stroke-dashoffset 1s ease; }
+
+        .modal-overlay { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .secret-input { background: rgba(0,0,0,0.4); border: 1px dashed rgba(168, 85, 247, 0.3); }
+        .secret-input:focus { border-color: rgba(168, 85, 247, 0.6); outline: none; }
+
+        .coin-badge { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3); }
+
+        .part-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s ease; }
+        .part-complete { border-color: rgba(74, 222, 128, 0.4) !important; background: rgba(74, 222, 128, 0.1) !important; }
+
+        .clicker-btn { transition: transform 0.1s ease; }
+        .clicker-btn:active { transform: scale(0.9); }
+
+        @media (max-width: 768px) {
+            #chat-box { padding: 12px !important; }
+            .msg-bubble { max-width: 90% !important; }
+        }
+
+        .chat-container { scroll-behavior: smooth; }
+    </style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<!-- Level Overlays -->
+<div id="level-up-overlay" class="fixed inset-0 z-[80] hidden items-center justify-center pointer-events-none">
+    <div class="text-center">
+        <h2 class="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 transform scale-0" id="levelup-title">LEVEL UP</h2>
+        <p class="text-4xl md:text-5xl font-mono text-white mt-4 font-bold transform scale-0" id="levelup-num">10</p>
+    </div>
+</div>
+<div id="level-down-overlay" class="fixed inset-0 z-[80] hidden items-center justify-center pointer-events-none">
+    <div class="text-center">
+        <h2 class="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-red-400 to-orange-500 transform scale-0" id="leveldown-title">LEVEL DOWN</h2>
+        <p class="text-4xl md:text-5xl font-mono text-red-400 mt-4 font-bold transform scale-0" id="leveldown-num">5</p>
+    </div>
+</div>
+
+<!-- Coin Notification -->
+<div id="coin-notification" class="fixed top-20 right-4 z-[90] hidden">
+    <div class="coin-badge px-4 py-2 rounded-xl text-gray-900 font-bold flex items-center gap-2">
+        <span id="coin-add-amount">+1</span><span>🪙</span>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div id="progress-modal" class="fixed inset-0 z-[70] hidden bg-black/90 flex items-center justify-center p-4 modal-overlay">
+    <div class="glass p-5 md:p-6 rounded-2xl w-full max-w-sm transform scale-90 opacity-0" id="progress-modal-content">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-xl font-bold text-blue-400">Прогресс Бати</h3>
+            <button onclick="closeModal('progress-modal','progress-modal-content')" class="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-gray-400">✕</button>
+        </div>
+        <div class="flex items-center justify-center mb-5">
+            <div class="relative">
+                <svg class="progress-ring w-32 h-32">
+                    <circle class="text-gray-800" stroke-width="6" stroke="currentColor" fill="transparent" r="50" cx="64" cy="64"/>
+                    <circle id="progress-ring-fill" class="progress-ring-circle text-blue-500" stroke-width="6" stroke="currentColor" fill="transparent" r="50" cx="64" cy="64" stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round"/>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center"><span id="progress-level-text" class="text-2xl font-black text-white">1</span></div>
+            </div>
+        </div>
+        <div class="space-y-3">
+            <div class="flex justify-between text-sm"><span class="text-gray-500">Уровень</span><span id="progress-current" class="text-blue-400 font-bold">Lvl 1</span></div>
+            <div class="w-full h-2.5 bg-gray-900 rounded-full overflow-hidden"><div id="progress-bar-fill" class="level-bar-fill h-full rounded-full" style="width: 1%"></div></div>
+            <div class="mt-3 p-3 bg-black/30 rounded-xl">
+                <p class="text-xs text-gray-500 mb-1">Статус</p>
+                <p id="progress-status" class="text-gray-300 text-sm">Батя только проснулся...</p>
+            </div>
+            <div class="mt-3 p-3 bg-purple-900/20 rounded-xl border border-purple-500/20">
+                <p class="text-xs text-purple-400 mb-2">🔐 Секретный код</p>
+                <div class="flex gap-2">
+                    <input type="text" id="secret-code-input" class="secret-input flex-1 rounded-lg px-3 py-2 text-white text-center font-mono uppercase" placeholder="????" maxlength="10">
+                    <button onclick="checkSecretCode()" class="px-4 py-2 rounded-lg bg-purple-600/50 text-purple-200 font-bold">→</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Garage Modal -->
+<div id="garage-modal" class="fixed inset-0 z-[70] hidden bg-black/90 flex items-center justify-center p-4 modal-overlay overflow-y-auto">
+    <div class="glass p-5 md:p-6 rounded-2xl w-full max-w-md transform scale-90 opacity-0 my-4" id="garage-modal-content">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-xl font-bold text-orange-400 flex items-center gap-2">🚗 Гараж Бати</h3>
+            <button onclick="closeModal('garage-modal','garage-modal-content')" class="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-gray-400">✕</button>
+        </div>
+        <div class="mb-4 p-4 bg-orange-900/20 rounded-xl border border-orange-500/20">
+            <div class="flex justify-between items-center mb-2">
+                <p class="text-sm text-orange-400">Прогресс</p>
+                <p id="car-progress-text" class="text-sm text-white font-mono font-bold">0/19</p>
+            </div>
+            <div class="w-full h-3 bg-gray-900 rounded-full overflow-hidden">
+                <div id="car-progress-bar" class="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all" style="width: 0%"></div>
+            </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mb-4" id="parts-grid"></div>
+        <div id="car-complete-msg" class="hidden mt-4 p-4 bg-green-900/30 rounded-xl border border-green-500/30 text-center">
+            <p class="text-green-400 font-bold">🎉 Машина собрана!</p>
+        </div>
+    </div>
+</div>
+
+<!-- Shop Modal -->
+<div id="shop-modal" class="fixed inset-0 z-[70] hidden bg-black/90 flex items-center justify-center p-4 modal-overlay overflow-y-auto">
+    <div class="glass p-5 md:p-6 rounded-2xl w-full max-w-md transform scale-90 opacity-0 my-4" id="shop-modal-content">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-xl font-bold text-yellow-400">🛒 Магазин</h3>
+            <button onclick="closeModal('shop-modal','shop-modal-content')" class="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-gray-400">✕</button>
+        </div>
+        <div class="mb-4 p-3 bg-yellow-900/20 rounded-xl border border-yellow-500/20 flex items-center justify-between">
+            <span class="text-yellow-400 text-sm">Баланс:</span>
+            <span class="coin-badge px-3 py-1 rounded-lg text-gray-900 font-bold text-sm"><span id="shop-balance">0</span>🪙</span>
+        </div>
+        <div class="space-y-2 max-h-[300px] overflow-y-auto" id="shop-list"></div>
+    </div>
+</div>
+
+<!-- Clicker Modal -->
+<div id="clicker-modal" class="fixed inset-0 z-[70] hidden bg-black/90 flex items-center justify-center p-4 modal-overlay">
+    <div class="glass p-5 md:p-6 rounded-2xl w-full max-w-sm transform scale-90 opacity-0" id="clicker-modal-content">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-xl font-bold text-yellow-400">🪙 BatyaClicker</h3>
+            <button onclick="closeModal('clicker-modal','clicker-modal-content')" class="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-gray-400">✕</button>
+        </div>
+        <div class="text-center mb-6">
+            <div class="coin-badge inline-flex px-6 py-3 rounded-xl text-gray-900 font-black text-2xl items-center gap-2">
+                <span id="clicker-balance">0</span><span>🪙</span>
+            </div>
+        </div>
+        <div class="flex justify-center mb-6">
+            <button id="clicker-btn" class="clicker-btn w-36 h-36 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-7xl shadow-xl border-4 border-yellow-300/40">🧔</button>
+        </div>
+        <p class="text-center text-gray-500 text-sm">1 клик = 1 BatyaCoin</p>
+    </div>
+</div>
+
+<!-- Nickname Modal -->
+<div id="nick-modal" class="fixed inset-0 z-[70] hidden bg-black/90 flex items-center justify-center p-4 modal-overlay">
+    <div class="glass p-5 md:p-6 rounded-2xl w-full max-w-sm transform scale-90 opacity-0" id="nick-modal-content">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 text-center">Введи свой ник</h3>
+        <input type="text" id="nick-input-modal" class="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 mb-4 font-mono text-center text-lg uppercase" placeholder="NICKNAME" maxlength="15">
+        <div class="flex gap-3">
+            <button onclick="closeModal('nick-modal','nick-modal-content')" class="flex-1 py-3 rounded-xl border border-white/10 text-gray-400">Отмена</button>
+            <button onclick="submitNick()" class="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold">Отправить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Welcome Screen -->
+<div id="welcome-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black overflow-hidden">
+    <div class="absolute inset-0 pointer-events-none">
+        <div class="absolute top-1/3 left-1/4 w-64 h-64 bg-blue-600/10 rounded-full blur-[100px]"></div>
+        <div class="absolute bottom-1/3 right-1/4 w-80 h-80 bg-purple-600/10 rounded-full blur-[100px]"></div>
+    </div>
+    <div class="relative z-10 text-center px-6">
+        <div id="welcome-lines" class="space-y-2 md:space-y-4 mb-10">
+            <p class="welcome-line text-lg md:text-xl text-gray-500">Тот самый...</p>
+            <p class="welcome-line text-xl md:text-2xl text-gray-400">Легендарный...</p>
+            <p class="welcome-line text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 welcome-glow py-2">BATYA</p>
+            <p class="welcome-line text-lg md:text-xl text-gray-500">Вернулся вновь...</p>
+        </div>
+        <button id="start-chat-btn" class="px-10 py-4 bg-white text-gray-900 font-bold rounded-full opacity-0 transform scale-90 hover:scale-105 transition-transform shadow-xl">НАЧАТЬ ЧАТ</button>
+        <p class="mt-8 text-xs text-gray-600 font-mono opacity-0" id="welcome-version">VER 3.6 BETA</p>
+    </div>
+</div>
+
+<!-- Main UI -->
+<div id="main-ui" class="hidden h-screen opacity-0">
+    <div class="flex h-full">
+        <aside id="sidebar" class="w-64 glass border-r border-white/5 p-4 flex-col hidden md:flex z-20 overflow-y-auto">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-xl">B</div>
+                <div>
+                    <h2 class="text-lg font-bold text-gray-100">BatyaGPT</h2>
+                    <span class="text-[9px] text-blue-400/70 font-mono">VER 3.6 BETA</span>
+                </div>
+            </div>
+            
+            <div class="mb-3 p-3 rounded-lg bg-yellow-900/20 border border-yellow-500/20 flex items-center justify-between">
+                <span class="text-yellow-400 text-sm">Баланс:</span>
+                <span class="coin-badge px-3 py-1 rounded-lg text-gray-900 font-bold text-sm"><span id="sidebar-balance">0</span>🪙</span>
+            </div>
+            
+            <div class="mb-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 cursor-pointer" onclick="openModal('progress-modal','progress-modal-content'); updateProgressUI();">
+                <div class="flex justify-between items-center mb-2">
+                    <p class="text-xs text-gray-500">Уровень</p>
+                    <p id="level-text" class="text-lg font-black text-blue-400 font-mono">Lvl 1</p>
+                </div>
+                <div class="w-full h-2 bg-gray-900 rounded-full overflow-hidden"><div id="level-fill" class="level-bar-fill h-full rounded-full" style="width: 1%"></div></div>
+            </div>
+            
+            <div class="space-y-2 mb-4">
+                <button onclick="openModal('clicker-modal','clicker-modal-content'); document.getElementById('clicker-balance').innerText=gameState.coins;" class="sidebar-btn w-full p-3 rounded-lg flex items-center gap-3 text-left">
+                    <span class="text-xl">🪙</span><span class="text-sm text-gray-200">BatyaClicker</span>
+                </button>
+                <button onclick="openModal('shop-modal','shop-modal-content'); updateShopUI();" class="sidebar-btn w-full p-3 rounded-lg flex items-center gap-3 text-left">
+                    <span class="text-xl">🛒</span><span class="text-sm text-gray-200">Магазин</span>
+                </button>
+                <button onclick="openModal('garage-modal','garage-modal-content'); updateGarageUI();" class="sidebar-btn w-full p-3 rounded-lg flex items-center gap-3 text-left">
+                    <span class="text-xl">🚗</span><span class="text-sm text-gray-200">Гараж</span>
+                </button>
+            </div>
+            
+            <div class="flex-1"></div>
+            <div class="text-[10px] text-gray-600 text-center font-mono p-2">Created by <span class="text-blue-400">VortexFlare</span></div>
+        </aside>
+
+        <main class="flex-1 flex flex-col relative overflow-hidden">
+            <div class="md:hidden glass p-3 border-b border-white/5 flex justify-between items-center z-20">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm">B</div>
+                    <span class="text-sm font-bold text-gray-100">BatyaGPT</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button onclick="openModal('clicker-modal','clicker-modal-content'); document.getElementById('clicker-balance').innerText=gameState.coins;" class="p-2 rounded-lg bg-white/5 text-base">🪙</button>
+                    <button onclick="openModal('shop-modal','shop-modal-content'); updateShopUI();" class="p-2 rounded-lg bg-white/5 text-base">🛒</button>
+                    <button onclick="openModal('garage-modal','garage-modal-content'); updateGarageUI();" class="p-2 rounded-lg bg-white/5 text-base">🚗</button>
+                    <button onclick="openModal('progress-modal','progress-modal-content'); updateProgressUI();" class="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+                        <span id="mobile-level" class="text-xs font-mono text-blue-400 font-bold">Lvl 1</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="chat-box" class="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 chat-container z-10"></div>
+
+            <div class="z-20 w-full bg-[#030305] border-t border-white/5 pb-4 pt-2">
+                <div id="quick-actions" class="px-3 pb-3 flex flex-wrap gap-2 justify-center max-w-3xl mx-auto"></div>
+                <div class="max-w-3xl mx-auto px-3 flex gap-2">
+                    <input id="user-input" type="text" placeholder="Напиши бате..." class="input-glow flex-1 bg-[#0c0c12] border border-white/10 text-gray-200 rounded-xl px-4 py-3 focus:outline-none text-sm">
+                    <button id="send-btn" class="px-4 py-3 bg-gradient-to-br from-blue-600 to-purple-600 text-white font-bold rounded-xl active:scale-95 transition-transform">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Bread Game -->
+<div id="game-overlay" class="fixed inset-0 z-[60] hidden bg-black/95 flex items-center justify-center p-3">
+    <div class="glass p-4 md:p-6 rounded-2xl w-full max-w-md text-center transform scale-95 opacity-0" id="bread-game-modal">
+        <h2 class="text-xl font-black text-blue-400 mb-3">СПАСАЙ БАТЮ</h2>
+        <p class="mb-3 text-gray-500 text-xs hidden md:block">A/← Влево, D/→ Вправо</p>
+        <div class="relative w-full max-w-[350px] mx-auto rounded-xl overflow-hidden border border-white/10">
+            <canvas id="game-canvas" class="game-canvas w-full" width="350" height="350" style="background:#0a0a14;"></canvas>
+            <div class="absolute top-3 right-3 bg-black/70 px-3 py-1 rounded-lg"><span id="game-timer" class="text-xl font-black text-red-400 font-mono">60</span></div>
+            <div id="game-over-screen" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center hidden">
+                <h3 class="text-2xl font-bold text-red-500 mb-4">БАТЮ ЗАШИБЛО!</h3>
+                <button onclick="startMiniGame()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg">Ещё раз</button>
+            </div>
+        </div>
+        <div class="flex md:hidden gap-3 mt-4">
+            <button id="btn-left" class="game-btn flex-1 h-14 rounded-xl border border-white/10 text-2xl flex items-center justify-center text-white">←</button>
+            <button id="btn-right" class="game-btn flex-1 h-14 rounded-xl border border-white/10 text-2xl flex items-center justify-center text-white">→</button>
+        </div>
+    </div>
+</div>
+
+<!-- Runner Game -->
+<div id="runner-overlay" class="fixed inset-0 z-[60] hidden bg-black/95 flex items-center justify-center p-3">
+    <div class="glass p-4 md:p-6 rounded-2xl w-full max-w-xl text-center transform scale-95 opacity-0" id="runner-game-modal">
+        <h2 class="text-xl font-black text-green-400 mb-3" id="runner-title">БАТЯ БЕЖИТ</h2>
+        <p class="mb-3 text-gray-500 text-xs hidden md:block">Пробел - прыжок</p>
+        <div class="relative w-full rounded-xl overflow-hidden border border-white/10">
+            <canvas id="runner-canvas" class="game-canvas w-full" width="500" height="200" style="background:#12121f;"></canvas>
+            <div class="absolute top-3 right-3 bg-black/70 px-3 py-1 rounded-lg"><span id="runner-timer" class="text-xl font-black text-green-400 font-mono">60</span></div>
+            <div id="runner-game-over" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center hidden">
+                <h3 class="text-2xl font-bold text-red-500 mb-4">БАТЯ СПОТКНУЛСЯ!</h3>
+                <button onclick="startRunnerGame()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg">Ещё раз</button>
+            </div>
+        </div>
+        <div class="md:hidden mt-4">
+            <button id="btn-jump" class="game-btn w-full h-16 bg-green-600/30 rounded-xl border border-green-500/30 text-xl flex items-center justify-center text-white font-bold">ПРЫЖОК ↑</button>
+        </div>
+    </div>
+</div>
+
+<!-- Horror Game -->
+<div id="horror-overlay" class="fixed inset-0 z-[60] hidden bg-black flex items-center justify-center p-3">
+    <div class="glass p-4 md:p-6 rounded-2xl w-full max-w-xl text-center transform scale-95 opacity-0" id="horror-game-modal">
+        <h2 class="text-xl font-black text-red-400 mb-3">ЗАБРОШЕННЫЙ ДОМ</h2>
+        <p class="mb-3 text-gray-500 text-xs hidden md:block">WASD - движение, E - взять</p>
+        <div class="relative w-full rounded-xl overflow-hidden border border-red-900/30">
+            <canvas id="horror-canvas" class="game-canvas w-full" width="500" height="320" style="background:#080406;"></canvas>
+            <div id="horror-win-screen" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-center hidden p-4">
+                <h3 class="text-2xl font-bold text-green-500 mb-3">БАТЯ ВЫБРАЛСЯ!</h3>
+                <div class="bg-purple-900/30 rounded-xl p-4 max-w-xs mb-4 border border-purple-500/30">
+                    <p class="text-purple-400 font-bold mb-2 text-sm">(От VortexFlare)</p>
+                    <p class="text-gray-300 text-xs">Секретная игра пока сырая, но скоро обновлю! Жди! :3</p>
+                </div>
+                <button id="horror-continue-btn" class="px-8 py-3 bg-green-600 text-white font-bold rounded-xl">Продолжить</button>
+            </div>
+        </div>
+        <div class="grid md:hidden grid-cols-3 gap-2 mt-4 max-w-[180px] mx-auto">
+            <div></div>
+            <button id="btn-up" class="game-btn h-12 rounded-lg border border-white/10 text-xl flex items-center justify-center text-white">↑</button>
+            <div></div>
+            <button id="btn-left-h" class="game-btn h-12 rounded-lg border border-white/10 text-xl flex items-center justify-center text-white">←</button>
+            <button id="btn-down" class="game-btn h-12 rounded-lg border border-white/10 text-xl flex items-center justify-center text-white">↓</button>
+            <button id="btn-right-h" class="game-btn h-12 rounded-lg border border-white/10 text-xl flex items-center justify-center text-white">→</button>
+        </div>
+        <button id="btn-interact" class="game-btn md:hidden mt-3 w-full max-w-[180px] h-10 rounded-lg border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 font-bold text-sm mx-auto">E - Взять</button>
+    </div>
+</div>
+
+<!-- Full Alert -->
+<div id="full-alert" class="fixed inset-0 z-[100] hidden bg-black flex flex-col items-center justify-center text-center p-6">
+    <h2 id="full-alert-text" class="text-2xl md:text-4xl font-black mb-4 text-gray-200 opacity-0"></h2>
+    <p id="full-alert-sub" class="text-gray-600 font-mono text-xs uppercase opacity-0 mb-6"></p>
+    <button id="restart-btn" class="hidden px-10 py-3 bg-blue-600 text-white font-bold rounded-full opacity-0">НАЧАТЬ ЗАНОВО</button>
+</div>
+
+<script>
+// NICK SCHEMAS
+const NICK_FIRST_V1={A:'Гениальный',B:'Балбес',C:'Сигма',D:'Душнила',E:'Эстет',F:'Флексер',G:'Гений',H:'Хейтер',I:'Имбовый',J:'Жёсткий',K:'Кринж',L:'Легенда',M:'Мемолог',N:'Нуб',O:'Олд',P:'Пранкер',Q:'Квестер',R:'Рофлер',S:'Сигмач',T:'Тильтер',U:'Угарный',V:'Вайбер',W:'WTFер',X:'Хайпер',Y:'Йоло',Z:'Зумер'};
+const NICK_FIRST_V2={A:'Абсурдный',B:'Беспонтовый',C:'Стремный',D:'Долбанутый',E:'Ебанутый',F:'Фейковый',G:'Глючный',H:'Хреновый',I:'Идиотский',J:'Жопорукий',K:'Кринжовый',L:'Лютый',M:'Мразотный',N:'Невменяемый',O:'Отбитый',P:'Полоумный',Q:'Куцый',R:'Рофляный',S:'Ссыкливый',T:'Тупорылый',U:'Упоротый',V:'Вонючий',W:'Weirdовый',X:'Хренопоймикакой',Y:'Йобнутый',Z:'Зашкварный'};
+const NICK_LAST_V1={A:'Админ',B:'Бургер',C:'Стул',D:'Дошик',E:'Енот',F:'Фонарик',G:'Горшок',H:'Хомяк',I:'Игрушка',J:'Жвачка',K:'Клавиатура',L:'Лампа',M:'Монитор',N:'Ноутбук',O:'Огурец',P:'Пицца',Q:'Квадрат',R:'Рюкзак',S:'Самокат',T:'Телефон',U:'Утюг',V:'Ведро',W:'Вафля',X:'Холодильник',Y:'Йогурт',Z:'Зонт'};
+const NICK_LAST_V2={A:'Арбузатор',B:'Бутерброд',C:'Самовар',D:'Дирижабль',E:'Емкость',F:'Фонарик',G:'Горшок',H:'Химик',I:'Индюк',J:'Жмых',K:'Кактус',L:'Лифт',M:'Миксер',N:'Носорог',O:'Огнетушитель',P:'Пылесос',Q:'Квант',R:'Ракета',S:'Скафандр',T:'Тапок',U:'Унитаз',V:'Вентилятор',W:'Вафлятор',X:'Холодильник',Y:'Йогурт',Z:'Завод'};
+
+// GAME STATE
+let gameState={level:1,coins:0,parts:{body:0,wheels:0,exhaust:0,engine:0,steering:0,gearbox:0,seats:0,lights:0,radio:0},runnerCompleted:false,horrorUnlocked:false};
+const PARTS_NEEDED={body:1,wheels:4,exhaust:2,engine:1,steering:1,gearbox:1,seats:4,lights:4,radio:1};
+const PARTS_PRICES={body:50,wheels:10,exhaust:20,engine:100,steering:10,gearbox:5,seats:20,lights:5,radio:100};
+const PARTS_NAMES={body:'Корпус',wheels:'Колесо',exhaust:'Выхлоп',engine:'Двигатель',steering:'Руль',gearbox:'Коробка',seats:'Сиденье',lights:'Фара',radio:'Магнитола'};
+const PARTS_EMOJI={body:'🚗',wheels:'🛞',exhaust:'💨',engine:'⚙️',steering:'🎮',gearbox:'🔧',seats:'💺',lights:'💡',radio:'📻'};
+
+function loadGame(){const s=localStorage.getItem('batyaGPT_save');if(s)try{gameState={...gameState,...JSON.parse(s)};}catch(e){}updateAllUI();}
+function saveGame(){localStorage.setItem('batyaGPT_save',JSON.stringify(gameState));}
+function updateAllUI(){document.getElementById('level-text').innerText=`Lvl ${gameState.level}`;document.getElementById('mobile-level').innerText=`Lvl ${gameState.level}`;document.getElementById('level-fill').style.width=`${gameState.level}%`;document.getElementById('sidebar-balance').innerText=gameState.coins;}
+function isCarComplete(){for(const[k,v]of Object.entries(PARTS_NEEDED))if(gameState.parts[k]<v)return false;return true;}
+
+// STARFIELD
+const canvas=document.getElementById('starfield'),ctx=canvas.getContext('2d');let stars=[];
+function initStars(){canvas.width=innerWidth;canvas.height=innerHeight;stars=[];for(let i=0;i<60;i++)stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,sz:Math.random()*1.2+0.3,op:Math.random()*0.2+0.05});}
+function animateStars(){ctx.clearRect(0,0,canvas.width,canvas.height);for(const s of stars){ctx.globalAlpha=s.op;ctx.fillStyle='#8892a8';ctx.beginPath();ctx.arc(s.x,s.y,s.sz,0,Math.PI*2);ctx.fill();}requestAnimationFrame(animateStars);}
+addEventListener('resize',initStars);initStars();animateStars();
+
+// WELCOME
+onload=()=>{loadGame();const tl=gsap.timeline();document.querySelectorAll('.welcome-line').forEach((l,i)=>tl.to(l,{opacity:1,y:0,duration:0.6,ease:"power2.out"},i*0.2));tl.to('#start-chat-btn',{opacity:1,scale:1,duration:0.6,ease:"back.out(1.5)"},"-=0.2").to('#welcome-version',{opacity:1,duration:0.4},"-=0.2");};
+document.getElementById('start-chat-btn').onclick=()=>{gsap.to('#welcome-screen',{opacity:0,duration:0.4,onComplete:()=>{document.getElementById('welcome-screen').style.display='none';document.getElementById('main-ui').classList.remove('hidden');document.getElementById('main-ui').style.display='block';gsap.to('#main-ui',{opacity:1,duration:0.4});addBatyaMessage("Здарова, ёпта. Чё пришёл? Выбирай чё надо или пиши сам.");showQuickActions(['дать расшифровать свой ник бате','дай мудрый совет от бати','Ку']);}});};
+
+// MODALS
+function openModal(id,contentId){document.getElementById(id).classList.remove('hidden');document.getElementById(id).classList.add('flex');gsap.to(`#${contentId}`,{scale:1,opacity:1,duration:0.4,ease:"back.out(1.5)"});}
+function closeModal(id,contentId){gsap.to(`#${contentId}`,{scale:0.9,opacity:0,duration:0.25,onComplete:()=>{document.getElementById(id).classList.add('hidden');document.getElementById(id).classList.remove('flex');}});}
+
+function updateProgressUI(){const circ=2*Math.PI*50;document.getElementById('progress-ring-fill').style.strokeDashoffset=circ-(gameState.level/100)*circ;document.getElementById('progress-level-text').innerText=gameState.level;document.getElementById('progress-current').innerText=`Lvl ${gameState.level}`;document.getElementById('progress-bar-fill').style.width=`${gameState.level}%`;let st="Батя только проснулся...";if(gameState.level>=70)st="Батя прошёл испытания! 🏆";else if(gameState.level>=60)st="Батя раскрыл секреты! 🔮";else if(gameState.level>=50)st="Батя в форме! 💪";else if(gameState.level>=20)st="Батя набирает силу...";else if(gameState.level>=10)st="Батя разминается...";document.getElementById('progress-status').innerText=st;}
+function checkSecretCode(){if(document.getElementById('secret-code-input').value.trim()==='6-7'){closeModal('progress-modal','progress-modal-content');setLevel(60);gameState.horrorUnlocked=true;saveGame();addBatyaMessage("Ёпта... Как ты узнал код? Ладно, разблокировал секретную игру...");showQuickActions(['начать секретную игру']);}else{gsap.to('#secret-code-input',{x:5,duration:0.05,yoyo:true,repeat:5});}}
+
+// GARAGE
+function updateGarageUI(){const grid=document.getElementById('parts-grid');let total=0,have=0;grid.innerHTML='';for(const[k,need]of Object.entries(PARTS_NEEDED)){const own=gameState.parts[k];total+=need;have+=Math.min(own,need);const complete=own>=need;grid.innerHTML+=`<div class="part-card p-2 rounded-lg text-center ${complete?'part-complete':''}"><div class="text-2xl">${PARTS_EMOJI[k]}</div><div class="text-[10px] text-gray-400">${PARTS_NAMES[k]}</div><div class="text-xs font-mono ${complete?'text-green-400':'text-gray-300'}">${Math.min(own,need)}/${need}</div></div>`;}document.getElementById('car-progress-bar').style.width=`${(have/total)*100}%`;document.getElementById('car-progress-text').innerText=`${have}/${total}`;document.getElementById('car-complete-msg').classList.toggle('hidden',have<total);}
+
+// SHOP
+function updateShopUI(){document.getElementById('shop-balance').innerText=gameState.coins;const list=document.getElementById('shop-list');list.innerHTML='';for(const[k,price]of Object.entries(PARTS_PRICES)){const own=gameState.parts[k],need=PARTS_NEEDED[k],canBuy=gameState.coins>=price&&own<need;list.innerHTML+=`<div class="part-card p-3 rounded-lg flex items-center justify-between"><div class="flex items-center gap-2"><span class="text-2xl">${PARTS_EMOJI[k]}</span><div><p class="text-gray-200 text-sm">${PARTS_NAMES[k]}</p><p class="text-xs text-gray-500">${own}/${need}</p></div></div><button onclick="buyPart('${k}')" class="px-3 py-1.5 rounded-lg font-bold text-xs ${canBuy?'bg-yellow-500 text-gray-900':'bg-gray-700 text-gray-500 cursor-not-allowed'}" ${!canBuy?'disabled':''}>${price}🪙</button></div>`;}}
+function buyPart(k){const p=PARTS_PRICES[k];if(gameState.coins>=p&&gameState.parts[k]<PARTS_NEEDED[k]){gameState.coins-=p;gameState.parts[k]++;saveGame();updateShopUI();updateAllUI();showCoinNotification(-p);}}
+
+// CLICKER
+document.getElementById('clicker-btn').onclick=()=>{gameState.coins++;saveGame();document.getElementById('clicker-balance').innerText=gameState.coins;document.getElementById('sidebar-balance').innerText=gameState.coins;gsap.fromTo('#clicker-btn',{scale:0.9},{scale:1,duration:0.15,ease:"back.out(2)"});showCoinNotification(1);};
+function showCoinNotification(amount){const n=document.getElementById('coin-notification');document.getElementById('coin-add-amount').innerText=(amount>0?'+':'')+amount;n.classList.remove('hidden');gsap.fromTo(n,{y:-15,opacity:0},{y:0,opacity:1,duration:0.3});setTimeout(()=>gsap.to(n,{opacity:0,duration:0.2,onComplete:()=>n.classList.add('hidden')}),1000);}
+
+// CHAT
+const chatBox=document.getElementById('chat-box');
+function addMessage(text,isUser=false){const msg=document.createElement('div');msg.className=`flex ${isUser?'justify-end':'justify-start'} items-end gap-2 mb-3`;msg.style.opacity='0';const avatar=!isUser?`<div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white">B</div>`:'';const bubbleClass=isUser?'msg-user rounded-xl rounded-tr-sm px-3 py-2 shadow max-w-[80%]':'msg-batya rounded-xl rounded-tl-sm px-3 py-2 shadow max-w-[80%]';msg.innerHTML=`${avatar}<div class="${bubbleClass}"><div class="leading-relaxed text-sm ${!isUser?'typing-cursor':''}">${text}</div></div>`;chatBox.appendChild(msg);gsap.to(msg,{opacity:1,duration:0.3,onUpdate:()=>chatBox.scrollTop=chatBox.scrollHeight});if(!isUser){const cd=msg.querySelector('.leading-relaxed');if(text.includes('nick-line')){cd.classList.remove('typing-cursor');cd.innerHTML=text;gsap.to(cd.querySelectorAll('.nick-line'),{opacity:1,x:0,duration:0.4,stagger:0.08});}else if(text.includes('<')){cd.classList.remove('typing-cursor');cd.innerHTML=text;}else{const orig=text;cd.innerText='';let i=0;const int=setInterval(()=>{cd.innerText+=orig[i++];chatBox.scrollTop=chatBox.scrollHeight;if(i>=orig.length){clearInterval(int);cd.classList.remove('typing-cursor');}},15);}}}
+function addBatyaMessage(text){addMessage(text,false);}
+
+function setLevel(lvl,isDown=false){if(gameState.level===lvl)return;gameState.level=lvl;saveGame();const ov=document.getElementById(isDown?'level-down-overlay':'level-up-overlay'),ti=document.getElementById(isDown?'leveldown-title':'levelup-title'),nu=document.getElementById(isDown?'leveldown-num':'levelup-num');ov.classList.remove('hidden');ov.classList.add('flex');nu.innerText=lvl;gsap.set([ti,nu],{scale:0,opacity:0});gsap.timeline().to([ti,nu],{scale:1,opacity:1,duration:0.5,ease:"back.out(1.7)",stagger:0.1}).to({},{duration:0.6}).to([ti,nu],{y:-30,scale:0.5,opacity:0,duration:0.4}).call(()=>{ov.classList.add('hidden');ov.classList.remove('flex');gsap.set([ti,nu],{y:0});updateAllUI();});}
+
+function showQuickActions(actions){const qa=document.getElementById('quick-actions');qa.innerHTML='';actions.forEach((act,i)=>{const btn=document.createElement('button');btn.className='btn-batya px-3 py-2 rounded-full text-xs font-semibold';btn.style.opacity='0';btn.innerText=act;btn.onclick=()=>handleAction(act);qa.appendChild(btn);gsap.to(btn,{opacity:1,duration:0.3,delay:i*0.05});});}
+
+function submitNick(){const val=document.getElementById('nick-input-modal').value.trim();if(!val||!/^[a-zA-Z]+$/.test(val)){gsap.to('#nick-modal-content',{x:8,duration:0.05,yoyo:true,repeat:5});return;}closeModal('nick-modal','nick-modal-content');addMessage(val,true);setTimeout(()=>processNick(val),400);}
+document.getElementById('nick-input-modal').onkeydown=e=>{if(e.key==='Enter')submitNick();};
+
+function processNick(nick){const clean=nick.toUpperCase();let html=`<div class="font-mono text-xs space-y-1.5 py-1">`;for(let i=0;i<clean.length;i++){const c=clean[i];const isLast=i===clean.length-1;const s1=isLast?NICK_LAST_V1:NICK_FIRST_V1;const s2=isLast?NICK_LAST_V2:NICK_FIRST_V2;const exp=Math.random()>0.5?s1[c]:s2[c];html+=`<div class="nick-line flex items-center gap-2"><span class="text-blue-400 font-bold bg-blue-500/10 w-7 h-7 flex items-center justify-center rounded">${c}</span><span class="text-gray-500">—</span><span class="text-gray-200">${exp||'???'}</span></div>`;}html+=`</div><div class="nick-line mt-2 text-gray-500 text-xs italic">...ёпта</div>`;addBatyaMessage(html);}
+
+function handleAction(action){if(action==='Ку'){addMessage("Ку",true);setLevel(10);addBatyaMessage("Здарова ёпта, че тебе от бати нужно?");showQuickActions(['хз, скажи че умеешь','мне нужен ты)','батя, когда за хлебом пойдешь?']);return;}if(action==='дать расшифровать свой ник бате'){addMessage(action,true);addBatyaMessage("Отлично ёпта, пиши свой ник сюда, латинскими буквами, скажу истину твоего ника... ");setTimeout(()=>openModal('nick-modal','nick-modal-content'),1200);return;}if(action==='начать секретную игру'){addMessage(action,true);startHorrorGame();return;}addMessage(action,true);if(action==='дай мудрый совет от бати'){["Запомни раз и на всегда, ёпта: Не уступай место бабкам в автобусе, потому что бабки в жизни не главное.","Отличник никогда не пойдет на бокс, потому что там он может получить двоечку.","Упал - Вставай , Вставал - Упай, Упай - Чокопай. Не суди. Не гуди."].forEach((t,i)=>setTimeout(()=>addBatyaMessage(t),i*2200));}else if(action==='хз, скажи че умеешь'||action==='мне нужен ты)'){addBatyaMessage((action==='хз, скажи че умеешь'?"Я пока ничё не умею, но ты можешь повысить уровень бати.":"Слышь, я тебе не девка, ёпта. Но если хочешь со мной тусить — качай мой уровень.")+" Для того что бы повысить левел бати пройди мою мини игру, ёпта.");showQuickActions(['пройти мини игру']);}else if(action==='батя, когда за хлебом пойдешь?'){if(!isCarComplete()){addBatyaMessage("Ёпта, на чём я поеду? Помоги мне собрать машину в гараже! Купи запчасти в магазине за BatyaCoin'ы.");showQuickActions(['открыть гараж','открыть магазин']);}else if(gameState.runnerCompleted){addBatyaMessage("Да заебали ёпта, ладно, пойду схожу, заодно балтику куплю себе.");setTimeout(triggerEnding,2000);}else{addBatyaMessage("Хлеб сам себя не купит, но сделаю я это чуть позже, пока чёто сил мало... Думаю тебе нужно прокачать мой уровень... пройди-ка еще одну игру, ёпта, и тогда мой лвл апнется.");showQuickActions(['начать игру']);}}else if(action==='открыть гараж'){openModal('garage-modal','garage-modal-content');updateGarageUI();}else if(action==='открыть магазин'){openModal('shop-modal','shop-modal-content');updateShopUI();}else if(action==='начать игру')startRunnerGame();else if(action==='пройти мини игру')startMiniGame();else if(action==='дать отдохнуть бате'){setLevel(5,true);addBatyaMessage("Ну и правильно, ёпта. Пойду вздремну...");showQuickActions(['закончить чат','разбудить батю']);}else if(action==='разбудить батю'){["БАТЯ","БАТЯ","БАТЯ ПРОСНИСЬ АЛЁ"].forEach((m,i)=>setTimeout(()=>addMessage(m,true),i*500));setTimeout(()=>{setLevel(20);addBatyaMessage("Да чё тебе надо блять, ёпта?!");showQuickActions(['бать, у нас хлеб закончился...','батя, когда за хлебом пойдешь?']);},2000);}else if(action==='бать, у нас хлеб закончился...'){addMessage("Бать, у нас хлеб закончился, сгоняй по бырому, а?",true);setTimeout(()=>{if(!isCarComplete()){addBatyaMessage("Ёпта, на чём я поеду? Помоги собрать машину!");showQuickActions(['открыть гараж','открыть магазин']);}else if(gameState.runnerCompleted){addBatyaMessage("Да заебали ёпта, ладно, пойду схожу, заодно балтику куплю себе.");setTimeout(triggerEnding,2000);}else{addBatyaMessage("Пройди-ка еще одну игру, ёпта.");showQuickActions(['начать игру']);}},800);}else if(action==='закончить чат')location.reload();}
+
+document.getElementById('send-btn').onclick=()=>{const v=document.getElementById('user-input').value.trim();if(!v)return;addMessage(v,true);document.getElementById('user-input').value='';if(['ку','привет','здарова','имба'].includes(v.toLowerCase())){setLevel(10);addBatyaMessage("Здарова ёпта, че тебе от бати нужно?");showQuickActions(['хз, скажи че умеешь','мне нужен ты)','батя, когда за хлебом пойдешь?']);}else addBatyaMessage("Ты чё там бормочешь? Говори по делу, ёпта.");};
+document.getElementById('user-input').onkeydown=e=>{if(e.key==='Enter')document.getElementById('send-btn').click();};
+
+// ===== BREAD MINI GAME =====
+let breadActive=false,breadTime=60,breadPlayerX=175,breadTargetX=175,breadItems=[],breadInterval=null,breadMoveL=false,breadMoveR=false,breadLastT=0;
+const breadCanvas=document.getElementById('game-canvas'),breadCtx=breadCanvas.getContext('2d');
+
+function startMiniGame(){document.getElementById('game-overlay').classList.remove('hidden');document.getElementById('game-overlay').classList.add('flex');document.getElementById('game-over-screen').classList.add('hidden');gsap.to('#bread-game-modal',{opacity:1,scale:1,duration:0.4});breadActive=true;breadTime=60;breadItems=[];breadPlayerX=breadTargetX=175;document.getElementById('game-timer').innerText=60;breadLastT=performance.now();if(breadInterval)clearInterval(breadInterval);breadInterval=setInterval(()=>{breadTime--;document.getElementById('game-timer').innerText=breadTime;if(breadTime<=0)endMiniGame(true);},1000);requestAnimationFrame(breadLoop);}
+
+function breadLoop(t){if(!breadActive)return;const dt=Math.min((t-breadLastT)/16.667,3);breadLastT=t;
+breadCtx.fillStyle='#0a0a14';breadCtx.fillRect(0,0,350,350);
+breadCtx.strokeStyle='rgba(255,255,255,0.03)';for(let i=0;i<350;i+=35){breadCtx.beginPath();breadCtx.moveTo(i,0);breadCtx.lineTo(i,350);breadCtx.stroke();breadCtx.beginPath();breadCtx.moveTo(0,i);breadCtx.lineTo(350,i);breadCtx.stroke();}
+if(breadMoveL)breadTargetX=Math.max(20,breadTargetX-8*dt);
+if(breadMoveR)breadTargetX=Math.min(295,breadTargetX+8*dt);
+breadPlayerX+=(breadTargetX-breadPlayerX)*0.25;
+breadCtx.fillStyle='#ffffff';breadCtx.font='38px Arial';breadCtx.fillText('🧔',breadPlayerX,320);
+if(Math.random()<0.015*dt)breadItems.push({x:Math.random()*300+25,y:-25,s:2+Math.random()*1.5,r:0});
+for(let i=breadItems.length-1;i>=0;i--){const b=breadItems[i];b.y+=b.s*dt;b.r+=0.025*dt;breadCtx.save();breadCtx.translate(b.x,b.y);breadCtx.rotate(b.r);breadCtx.fillStyle='#ffffff';breadCtx.font='28px Arial';breadCtx.fillText('🍞',-14,0);breadCtx.restore();if(b.y>285&&b.y<335&&Math.abs(b.x-breadPlayerX-18)<35){endMiniGame(false);return;}if(b.y>380)breadItems.splice(i,1);}
+requestAnimationFrame(breadLoop);}
+
+function endMiniGame(won){breadActive=false;if(breadInterval)clearInterval(breadInterval);if(won){gsap.to('#bread-game-modal',{opacity:0,scale:0.9,duration:0.3,onComplete:()=>{document.getElementById('game-overlay').classList.add('hidden');document.getElementById('game-overlay').classList.remove('flex');setLevel(20);addBatyaMessage("Ахуеть.. как ты это сделал? Ладно, прошёл так прошёл, ну я кстати тебе ничё не обещал, поэтому пойду пивка бухну... посплю...");showQuickActions(['дать отдохнуть бате','разбудить батю']);}});}else document.getElementById('game-over-screen').classList.remove('hidden');}
+
+document.addEventListener('keydown',e=>{if(e.code==='KeyA'||e.key==='ArrowLeft')breadMoveL=true;if(e.code==='KeyD'||e.key==='ArrowRight')breadMoveR=true;});
+document.addEventListener('keyup',e=>{if(e.code==='KeyA'||e.key==='ArrowLeft')breadMoveL=false;if(e.code==='KeyD'||e.key==='ArrowRight')breadMoveR=false;});
+
+const btnL=document.getElementById('btn-left'),btnR=document.getElementById('btn-right');
+btnL.addEventListener('touchstart',e=>{e.preventDefault();breadMoveL=true;},{passive:false});
+btnL.addEventListener('touchend',e=>{e.preventDefault();breadMoveL=false;},{passive:false});
+btnL.addEventListener('mousedown',()=>breadMoveL=true);
+btnL.addEventListener('mouseup',()=>breadMoveL=false);
+btnR.addEventListener('touchstart',e=>{e.preventDefault();breadMoveR=true;},{passive:false});
+btnR.addEventListener('touchend',e=>{e.preventDefault();breadMoveR=false;},{passive:false});
+btnR.addEventListener('mousedown',()=>breadMoveR=true);
+btnR.addEventListener('mouseup',()=>breadMoveR=false);
+
+// ===== RUNNER GAME =====
+let runnerActive=false,runnerTime=60,runnerBatyaY=0,runnerBatyaVel=0,runnerJumping=false,runnerObs=[],runnerSpeed=4,runnerLastT=0,runnerObsTimer=0,runnerPhase=1,runnerSnow=[],runnerDlgStep=0,runnerShowDlg=false,runnerPinX=500,runnerInterval=null;
+const runnerCanvas=document.getElementById('runner-canvas'),runnerCtx=runnerCanvas.getContext('2d');
+
+function startRunnerGame(){document.getElementById('runner-overlay').classList.remove('hidden');document.getElementById('runner-overlay').classList.add('flex');document.getElementById('runner-game-over').classList.add('hidden');document.getElementById('runner-title').innerText='БАТЯ БЕЖИТ';gsap.to('#runner-game-modal',{opacity:1,scale:1,duration:0.4});
+runnerActive=true;runnerTime=60;runnerPhase=1;runnerBatyaY=runnerBatyaVel=0;runnerJumping=false;runnerObs=[];runnerSpeed=4;runnerSnow=[];runnerPinX=500;runnerDlgStep=0;runnerShowDlg=false;
+document.getElementById('runner-timer').innerText=60;runnerLastT=performance.now();runnerObsTimer=0;
+if(runnerInterval)clearInterval(runnerInterval);
+runnerInterval=setInterval(()=>{if(runnerShowDlg)return;runnerTime--;document.getElementById('runner-timer').innerText=runnerTime;if(runnerPhase===1&&runnerTime%15===0)runnerSpeed+=0.4;if(runnerPhase===1&&runnerTime<=0)runnerTriggerPin();if(runnerPhase===2&&runnerTime<=0)runnerPinTrip();},1000);
+requestAnimationFrame(runnerLoop);}
+
+function runnerTriggerPin(){runnerShowDlg=true;runnerSpeed=0;runnerPinX=520;let idx=0;const dlgs=[{s:'b',t:'ты кто, ёпта?'},{s:'p',t:'Йа ПиН.'},{s:'p',t:'Залез в мой FatherLand?!'},{s:'p',t:'Поплатишь. Йа Йа.'}];const next=()=>{if(idx<dlgs.length){runnerDlgStep=idx+1;idx++;setTimeout(next,1800);}else{runnerShowDlg=false;runnerPhase=2;runnerTime=60;runnerSpeed=4;runnerObs=[];runnerObsTimer=0;document.getElementById('runner-title').innerText='УБЕГАЙ ОТ ПИНА!';for(let i=0;i<30;i++)runnerSnow.push({x:Math.random()*500,y:Math.random()*200,sz:Math.random()*2+0.5,sp:Math.random()*1.2+0.3});}};setTimeout(next,600);}
+
+function runnerPinTrip(){runnerShowDlg=true;runnerSpeed=0;runnerDlgStep=10;setTimeout(()=>{runnerActive=false;if(runnerInterval)clearInterval(runnerInterval);gsap.to('#runner-game-modal',{opacity:0,scale:0.9,duration:0.3,onComplete:()=>{document.getElementById('runner-overlay').classList.add('hidden');document.getElementById('runner-overlay').classList.remove('flex');gameState.runnerCompleted=true;saveGame();setLevel(50);addBatyaMessage("Ёпта... Что это вообще было? Какой-то пингвин... Ладно, теперь я в форме!");showQuickActions(['батя, когда за хлебом пойдешь?','бать, у нас хлеб закончился...']);}});},2000);}
+
+function runnerLoop(t){if(!runnerActive)return;const dt=Math.min((t-runnerLastT)/16.667,3);runnerLastT=t;
+const groundY=160;
+if(runnerPhase===1){runnerCtx.fillStyle='#12121f';runnerCtx.fillRect(0,0,500,200);}else{const g=runnerCtx.createLinearGradient(0,0,0,200);g.addColorStop(0,'#1a2f4a');g.addColorStop(1,'#0d1f35');runnerCtx.fillStyle=g;runnerCtx.fillRect(0,0,500,200);runnerCtx.fillStyle='rgba(255,255,255,0.06)';runnerCtx.font='14px Arial';runnerCtx.fillText('6-7',465,18);for(const s of runnerSnow){s.y+=s.sp*dt;s.x-=runnerSpeed*0.1*dt;if(s.y>200){s.y=-3;s.x=Math.random()*500;}if(s.x<0)s.x=500;runnerCtx.fillStyle='rgba(255,255,255,0.7)';runnerCtx.beginPath();runnerCtx.arc(s.x,s.y,s.sz,0,Math.PI*2);runnerCtx.fill();}}
+runnerCtx.fillStyle=runnerPhase===1?'#252540':'#b8d4e8';runnerCtx.fillRect(0,groundY+32,500,30);
+if(!runnerShowDlg){if(runnerJumping||runnerBatyaY<0){runnerBatyaVel+=0.6*dt;runnerBatyaY+=runnerBatyaVel*dt;if(runnerBatyaY>=0){runnerBatyaY=runnerBatyaVel=0;runnerJumping=false;}}runnerObsTimer+=dt;if(runnerObsTimer>60){runnerObs.push({x:520,type:runnerPhase===1?'v':'s'});runnerObsTimer=0;}for(let i=runnerObs.length-1;i>=0;i--){runnerObs[i].x-=runnerSpeed*dt;if(runnerObs[i].x>45&&runnerObs[i].x<95&&runnerBatyaY>-45){runnerActive=false;if(runnerInterval)clearInterval(runnerInterval);document.getElementById('runner-game-over').classList.remove('hidden');return;}if(runnerObs[i].x<-40)runnerObs.splice(i,1);}}
+runnerCtx.fillStyle='#ffffff';runnerCtx.font='40px Arial';runnerCtx.fillText('🧔',60,groundY+25+runnerBatyaY);
+for(const o of runnerObs){runnerCtx.fillStyle='#ffffff';runnerCtx.font='32px Arial';runnerCtx.fillText(o.type==='v'?'🍾':'⛄',o.x,groundY+28);}
+if(runnerPhase===2&&!runnerShowDlg){runnerCtx.fillStyle='#ffffff';runnerCtx.font='36px Arial';const pY=runnerJumping?runnerBatyaY*0.6:0;runnerCtx.fillText('🐧',-10,groundY+25+pY);}
+if(runnerShowDlg&&runnerDlgStep>0&&runnerDlgStep<=4){const dlgs=[{s:'b',t:'ты кто, ёпта?'},{s:'p',t:'Йа ПиН.'},{s:'p',t:'Залез в FatherLand?!'},{s:'p',t:'Поплатишь. Йа Йа.'}];const d=dlgs[runnerDlgStep-1];if(runnerPinX>350)runnerPinX-=3*dt;runnerCtx.fillStyle='#ffffff';runnerCtx.font='36px Arial';runnerCtx.fillText('🐧',runnerPinX,groundY+25);const bx=d.s==='b'?45:runnerPinX-15,by=groundY-50;runnerCtx.fillStyle='white';runnerCtx.beginPath();runnerCtx.roundRect(bx,by,120,40,8);runnerCtx.fill();runnerCtx.fillStyle='#1a1a2a';runnerCtx.font='bold 10px Arial';runnerCtx.fillText(d.t,bx+8,by+25);}
+if(runnerDlgStep===10){runnerCtx.save();runnerCtx.translate(50,groundY+40);runnerCtx.rotate(Math.PI/3);runnerCtx.fillStyle='#ffffff';runnerCtx.font='36px Arial';runnerCtx.fillText('🐧',0,0);runnerCtx.restore();runnerCtx.fillStyle='white';runnerCtx.beginPath();runnerCtx.roundRect(20,groundY-50,110,32,8);runnerCtx.fill();runnerCtx.fillStyle='#1a1a2a';runnerCtx.font='bold 10px Arial';runnerCtx.fillText('Йа Вернусь...',30,groundY-28);}
+requestAnimationFrame(runnerLoop);}
+
+function runnerJump(){if(!runnerJumping&&runnerBatyaY===0&&!runnerShowDlg&&runnerActive){runnerJumping=true;runnerBatyaVel=-12;}}
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&runnerActive){e.preventDefault();runnerJump();}});
+const btnJump=document.getElementById('btn-jump');
+btnJump.addEventListener('touchstart',e=>{e.preventDefault();runnerJump();},{passive:false});
+btnJump.addEventListener('mousedown',e=>{e.preventDefault();runnerJump();});
+
+// ===== HORROR GAME =====
+let horrorActive=false,horrorX=80,horrorY=160,horrorRoom=0,horrorFlash=false,horrorFlashPick=false,horrorLastT=0;
+let horrorU=false,horrorD=false,horrorL=false,horrorR=false;
+const horrorCanvas=document.getElementById('horror-canvas'),horrorCtx=horrorCanvas.getContext('2d');
+
+function startHorrorGame(){document.getElementById('horror-overlay').classList.remove('hidden');document.getElementById('horror-overlay').classList.add('flex');document.getElementById('horror-win-screen').classList.add('hidden');gsap.to('#horror-game-modal',{opacity:1,scale:1,duration:0.4});horrorActive=true;horrorX=80;horrorY=160;horrorRoom=0;horrorFlash=false;horrorFlashPick=false;horrorLastT=performance.now();requestAnimationFrame(horrorLoop);}
+
+function horrorLoop(t){if(!horrorActive)return;const dt=Math.min((t-horrorLastT)/16.667,3);horrorLastT=t;
+horrorCtx.fillStyle='#080406';horrorCtx.fillRect(0,0,500,320);
+const sp=3.5*dt;
+if(horrorU&&horrorY>40)horrorY-=sp;
+if(horrorD&&horrorY<280)horrorY+=sp;
+if(horrorL&&horrorX>40)horrorX-=sp;
+if(horrorR&&horrorX<(horrorRoom===0?400:450))horrorX+=sp;
+if(horrorRoom===0){horrorCtx.fillStyle='#16120f';horrorCtx.fillRect(15,15,470,290);horrorCtx.strokeStyle='rgba(40,30,20,0.2)';for(let i=0;i<500;i+=40){horrorCtx.beginPath();horrorCtx.moveTo(i,0);horrorCtx.lineTo(i,320);horrorCtx.stroke();}horrorCtx.fillStyle='#2a2018';horrorCtx.fillRect(420,50,65,80);horrorCtx.fillStyle='#888';horrorCtx.font='bold 9px Arial';horrorCtx.fillText('🔒ЗАКРЫТО',425,95);horrorCtx.fillStyle='#3a2515';horrorCtx.fillRect(420,190,65,80);horrorCtx.fillStyle='#ffd700';horrorCtx.beginPath();horrorCtx.arc(428,230,4,0,Math.PI*2);horrorCtx.fill();horrorCtx.fillStyle='rgba(255,220,150,0.2)';horrorCtx.font='10px Arial';horrorCtx.fillText('Войти →',428,180);if(horrorX>395&&horrorY>190&&horrorY<270){horrorRoom=1;horrorX=70;}}else if(horrorRoom===1){horrorCtx.fillStyle='#12100d';horrorCtx.fillRect(15,15,470,290);horrorCtx.fillStyle='#4a3525';horrorCtx.fillRect(200,130,100,50);horrorCtx.fillStyle='#3a2818';horrorCtx.fillRect(210,180,10,40);horrorCtx.fillRect(280,180,10,40);if(!horrorFlash){horrorCtx.fillStyle='#ffffff';horrorCtx.font='24px Arial';horrorCtx.fillText('🔦',235,125);const distF=Math.sqrt(Math.pow(horrorX-250,2)+Math.pow(horrorY-160,2));horrorFlashPick=distF<60;if(horrorFlashPick){horrorCtx.fillStyle='rgba(255,255,100,0.4)';horrorCtx.font='bold 12px Arial';horrorCtx.fillText('[E] Взять',210,95);}}horrorCtx.fillStyle='#3a2515';horrorCtx.fillRect(435,120,50,80);horrorCtx.fillStyle='#4ade80';horrorCtx.font='bold 9px Arial';horrorCtx.fillText('ВЫХОД→',440,165);if(horrorX>410&&horrorY>120&&horrorY<200){horrorActive=false;document.getElementById('horror-win-screen').classList.remove('hidden');return;}}
+horrorCtx.fillStyle='#ffffff';horrorCtx.font='40px Arial';horrorCtx.fillText('🧔',horrorX,horrorY);if(horrorFlash){horrorCtx.fillStyle='#ffffff';horrorCtx.font='16px Arial';horrorCtx.fillText('🔦',horrorX+30,horrorY-12);}
+const vig=horrorCtx.createRadialGradient(250,160,horrorFlash?130:70,250,160,320);vig.addColorStop(0,'transparent');vig.addColorStop(1,'rgba(0,0,0,0.85)');horrorCtx.fillStyle=vig;horrorCtx.fillRect(0,0,500,320);
+if(horrorFlash){const fl=horrorCtx.createRadialGradient(horrorX+25,horrorY-15,0,horrorX+25,horrorY-15,100);fl.addColorStop(0,'rgba(255,255,200,0.25)');fl.addColorStop(1,'transparent');horrorCtx.fillStyle=fl;horrorCtx.fillRect(0,0,500,320);}
+requestAnimationFrame(horrorLoop);}
+
+function horrorPickup(){if(horrorFlashPick&&!horrorFlash&&horrorRoom===1){horrorFlash=true;}}
+document.addEventListener('keydown',e=>{if(!horrorActive)return;if(e.code==='KeyW')horrorU=true;if(e.code==='KeyS')horrorD=true;if(e.code==='KeyA')horrorL=true;if(e.code==='KeyD')horrorR=true;if(e.code==='KeyE')horrorPickup();});
+document.addEventListener('keyup',e=>{if(e.code==='KeyW')horrorU=false;if(e.code==='KeyS')horrorD=false;if(e.code==='KeyA')horrorL=false;if(e.code==='KeyD')horrorR=false;});
+
+const hBtnU=document.getElementById('btn-up'),hBtnD=document.getElementById('btn-down'),hBtnL=document.getElementById('btn-left-h'),hBtnR=document.getElementById('btn-right-h'),hBtnE=document.getElementById('btn-interact');
+function hTouch(el,dir){const set=v=>{if(dir==='u')horrorU=v;if(dir==='d')horrorD=v;if(dir==='l')horrorL=v;if(dir==='r')horrorR=v;};el.addEventListener('touchstart',e=>{e.preventDefault();set(true);},{passive:false});el.addEventListener('touchend',e=>{e.preventDefault();set(false);},{passive:false});el.addEventListener('mousedown',()=>set(true));el.addEventListener('mouseup',()=>set(false));}
+hTouch(hBtnU,'u');hTouch(hBtnD,'d');hTouch(hBtnL,'l');hTouch(hBtnR,'r');
+hBtnE.addEventListener('touchstart',e=>{e.preventDefault();horrorPickup();},{passive:false});
+hBtnE.addEventListener('click',horrorPickup);
+document.getElementById('horror-continue-btn').onclick=()=>{gsap.to('#horror-game-modal',{opacity:0,scale:0.9,duration:0.3,onComplete:()=>{document.getElementById('horror-overlay').classList.add('hidden');document.getElementById('horror-overlay').classList.remove('flex');setLevel(70);saveGame();addBatyaMessage("Ёпта... еле выбрался из этого места... Ладно, теперь я точно готов за хлебом идти!");showQuickActions(['батя, когда за хлебом пойдешь?']);}});};
+
+// ENDING
+function triggerEnding(){const alertBox=document.getElementById('full-alert'),alertText=document.getElementById('full-alert-text'),alertSub=document.getElementById('full-alert-sub'),restartBtn=document.getElementById('restart-btn');alertBox.classList.remove('hidden');alertText.innerText="Батя поехал за хлебом на тачке...";alertSub.innerText="";gsap.timeline().to(alertText,{opacity:1,duration:1.2}).to(alertText,{opacity:0,duration:0.6,delay:1.5}).call(()=>{setLevel(100);alertText.innerText="Скоро VortexFlare завезёт продолжение...";alertText.className="text-xl md:text-3xl font-black mb-4 text-gray-200";alertSub.innerText="BatyaGPT 3.6 BETA — THE END";}).to(alertText,{opacity:1,duration:1}).to(alertSub,{opacity:1,duration:0.6},"-=0.4").call(()=>restartBtn.classList.remove('hidden')).to(restartBtn,{opacity:1,duration:0.5});restartBtn.onclick=()=>location.reload();}
+</script>
+</body>
+</html>
